@@ -108,7 +108,7 @@
         cpu: { type: 'cpu', refreshInterval: 2000 },
         memory: { type: 'memory', refreshInterval: 2000 },
         disk: { type: 'disk', refreshInterval: 10000 },
-        battery: { type: 'battery', refreshInterval: 10000 },
+        battery: { type: 'battery', refreshInterval: 2500 },
         media: { type: 'media' },
         systray: { type: 'systray' },
       });
@@ -437,6 +437,32 @@
         el.diskBlock.title = `Disk (${primaryDisk.mountPoint}): ${availGiB} GiB available`;
       }
 
+      function getBatteryIcon(pct, isCharging) {
+        if (isCharging) {
+          if (pct >= 95) return '󰂅';
+          if (pct >= 85) return '󰂋';
+          if (pct >= 75) return '󰂊';
+          if (pct >= 65) return '󰢞';
+          if (pct >= 55) return '󰂉';
+          if (pct >= 45) return '󰢝';
+          if (pct >= 35) return '󰂈';
+          if (pct >= 25) return '󰂇';
+          if (pct >= 15) return '󰂆';
+          return '󰢜';
+        }
+        if (pct >= 95) return '󰁹';
+        if (pct >= 85) return '󰂂';
+        if (pct >= 75) return '󰂁';
+        if (pct >= 65) return '󰂀';
+        if (pct >= 55) return '󰁿';
+        if (pct >= 45) return '󰁾';
+        if (pct >= 35) return '󰁽';
+        if (pct >= 25) return '󰁼';
+        if (pct >= 15) return '󰁻';
+        if (pct >= 5) return '󰁺';
+        return '󰂎';
+      }
+
       function updateBattery(battery) {
         const hasBattery = battery && battery.chargePercent != null;
         if (!hasBattery) {
@@ -450,16 +476,31 @@
 
         const pct = Math.round(battery.chargePercent);
         const isCharging = battery.isCharging || battery.state === 'charging';
-        const icon = isCharging ? '󰂄' : pct <= 15 ? '󰂎' : '󰁹';
 
-        el.batteryIcon.textContent = icon;
+        el.batteryIcon.textContent = getBatteryIcon(pct, isCharging);
         el.batteryText.textContent = `${pct}%`;
-        el.batteryBlock.title = `Battery: ${pct}% (${isCharging ? 'Charging' : 'Discharging'})`;
 
-        if (pct <= 15 && !isCharging) {
-          el.batteryBlock.classList.add('color-bad');
-        } else {
-          el.batteryBlock.classList.remove('color-bad');
+        let tooltip = `Battery: ${pct}% (${isCharging ? 'Charging' : 'Discharging'})`;
+        const timeRemainingMs = isCharging ? battery.timeTillFull : battery.timeTillEmpty;
+        if (timeRemainingMs && timeRemainingMs > 0) {
+          const totalMinutes = Math.round(timeRemainingMs / 60000);
+          const hours = Math.floor(totalMinutes / 60);
+          const mins = totalMinutes % 60;
+          const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+          tooltip += ` (${timeStr} ${isCharging ? 'until full' : 'left'})`;
+        }
+        if (battery.powerConsumption != null && battery.powerConsumption > 0) {
+          tooltip += ` • ${battery.powerConsumption.toFixed(1)}W`;
+        }
+        el.batteryBlock.title = tooltip;
+
+        el.batteryBlock.classList.remove('color-bad', 'color-degraded');
+        if (!isCharging) {
+          if (pct <= 20) {
+            el.batteryBlock.classList.add('color-bad');
+          } else if (pct <= 35) {
+            el.batteryBlock.classList.add('color-degraded');
+          }
         }
       }
 
